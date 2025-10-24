@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calendario Split v4.2 — parallelo come mockup</title>
+<style>
+  :root{
+    --text:#e6edf3; --muted:#9aa7b3;
+    --accent:#6f3cff; --accent2:#6f3cff; /* linee viola stile mockup */
+    --bgAlpha:0; --todayBg:#ffffff; --todayFg:#0a0c10;
+    --shift:36px;   /* sposta tutta la GRIGLIA verso il basso */
+    --rshift:0px;   /* nudge verticale del pannello destro */
+    --underline:4px;/* spessore linea settimanale */
+    --gapV:14px;    /* spazio fra settimane */
+    --gapH:10px;    /* spazio fra giorni */
+    --bigSize:128px;/* dimensione numero grande */
+  }
+  html,body{height:100%;margin:0;color:var(--text);font:16px system-ui}
+  body{background:#0a0c10} /* default nero */
+  .wrap{height:100%;padding:12px;box-sizing:border-box}
+  .card{height:100%;border-radius:18px;background:rgba(10,12,16,var(--bgAlpha));border: calc(var(--bgAlpha) * 1px) solid rgba(255,255,255,.12);
+        display:grid;grid-template-columns: 0.58fr 0.42fr;gap:18px;overflow:hidden}
+  /* LEFT = grid */
+  .left{padding:16px; display:flex; flex-direction:column}
+  .leftInner{margin-top:var(--shift);} /* controllo fine per abbassare la griglia */
+  .dows{display:grid;grid-template-columns:repeat(7,1fr);gap:var(--gapH);margin-bottom:8px}
+  .dowCell{font-size:13px;color:var(--muted);text-align:center;text-transform:uppercase; text-shadow:0 1px 2px rgba(0,0,0,.35)}
+  .dows .dowCell:first-child,
+  .dows .dowCell:last-child{ color:#f2c94c; font-weight:900; } /* D & S gialli */
+  .weeks{display:flex;flex-direction:column;gap:var(--gapV)}
+  .week{position:relative; display:grid;grid-template-columns:repeat(7,1fr);gap:var(--gapH)}
+  .underline{position:absolute; left:4px; right:4px; bottom:calc(var(--underline) * -0.8);
+             height:var(--underline); border-radius:var(--underline);
+             background:linear-gradient(90deg, var(--accent), var(--accent2)); opacity:.95}
+  .day{padding:10px 0;text-align:center;border-radius:12px;border:1px solid transparent;font-size:22px; 
+       text-shadow:0 1px 2px rgba(0,0,0,.55);}
+  .dim{opacity:.35}
+  .sun,.sat{color:#f2c94c}
+  .today{background:var(--todayBg); color:var(--todayFg); font-weight:900; box-shadow:0 2px 10px rgba(0,0,0,.25)}
+  /* RIGHT = big day */
+  .right{padding:16px; display:grid; grid-template-rows: auto 1fr auto; align-items:center; transform: translateY(var(--rshift));}
+  .dow{font-weight:900;letter-spacing:.35px;opacity:.95;text-transform:uppercase; text-shadow:0 1px 2px rgba(0,0,0,.6);}
+  .big{justify-self:center; font-size:var(--bigSize);line-height:.9;font-weight:900;letter-spacing:1px;text-shadow:0 2px 6px rgba(0,0,0,.5)}
+  .monthyear{justify-self:center; font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.6px; text-shadow:0 1px 2px rgba(0,0,0,.5)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card" id="card">
+    <div class="left">
+      <div class="leftInner">
+        <div class="dows" id="dows"></div>
+        <div class="weeks" id="weeks"></div>
+      </div>
+    </div>
+    <div class="right">
+      <div class="dow" id="dowFull">—</div>
+      <div class="big" id="bigNum">--</div>
+      <div class="monthyear" id="monthYear">—</div>
+    </div>
+  </div>
+</div>
+<script>
+// Params: scale, shift, rshift, line, big, gapV, gapH, bg, alpha
+const qs=new URLSearchParams(location.search);
+const scale=Math.max(0.8, Math.min(1.8, parseFloat(qs.get('scale')) || 1.2));
+document.documentElement.style.fontSize=(16*scale)+'px';
+const bg=qs.get('bg')||'black';
+if(bg==='white'){ document.body.style.background='#ffffff'; }
+else if(bg==='clear'){ document.body.style.background='transparent'; document.documentElement.style.setProperty('--bgAlpha','0'); }
+else if(bg==='glass'){ document.body.style.background='transparent'; const a=Math.max(0,Math.min(0.3, parseFloat(qs.get('alpha')) || 0.20)); document.documentElement.style.setProperty('--bgAlpha', a.toString()); }
+if(qs.get('accent')) document.documentElement.style.setProperty('--accent','#'+qs.get('accent'));
+if(qs.get('accent2')) document.documentElement.style.setProperty('--accent2','#'+qs.get('accent2'));
+if(qs.get('shift')){ const v=qs.get('shift'); if(/^\d+$/g.test(v)) document.documentElement.style.setProperty('--shift', v+'px'); }
+if(qs.get('rshift')){ const v=qs.get('rshift'); if(/^\-?\d+$/g.test(v)) document.documentElement.style.setProperty('--rshift', v+'px'); }
+if(qs.get('line')){ const v=qs.get('line'); if(/^\d+$/g.test(v)) document.documentElement.style.setProperty('--underline', v+'px'); }
+if(qs.get('big')){ const v=qs.get('big'); if(/^\d+$/g.test(v)) document.documentElement.style.setProperty('--bigSize', v+'px'); }
+if(qs.get('gapV')){ const v=qs.get('gapV'); if(/^\d+$/g.test(v)) document.documentElement.style.setProperty('--gapV', v+'px'); }
+if(qs.get('gapH')){ const v=qs.get('gapH'); if(/^\d+$/g.test(v)) document.documentElement.style.setProperty('--gapH', v+'px'); }
+
+function titleCase(it){ return it.replace(/\b\w/g, c=>c.toUpperCase()); }
+
+function render(date){
+  // RIGHT: Day header, big number, month+year
+  const dowFull = date.toLocaleDateString('it-IT',{weekday:'long'}).toUpperCase();
+  const big = date.getDate();
+  const monthYear = (date.toLocaleDateString('it-IT',{month:'long'})+' '+date.getFullYear()).toUpperCase();
+  document.getElementById('dowFull').textContent=dowFull;
+  document.getElementById('bigNum').textContent=big;
+  document.getElementById('monthYear').textContent=monthYear;
+
+  // LEFT: Sunday-first grid
+  const dows = ['D','L','M','M','G','V','S'];
+  document.getElementById('dows').innerHTML = dows.map(x=>`<div class="dowCell">${x}</div>`).join('');
+
+  const y=date.getFullYear(), m=date.getMonth();
+  const first=new Date(y,m,1);
+  const last=new Date(y,m+1,0);
+  const prevLast=new Date(y,m,0);
+  const start = first.getDay(); // 0=Sun..6=Sat
+  const total = start + last.getDate();
+  const cells = Math.ceil(total/7)*7;
+  const today=new Date();
+
+  let weeksHTML='';
+  for(let r=0;r<cells/7;r++){
+    let row='';
+    for(let c=0;c<7;c++){
+      const i=r*7+c;
+      const dayNum = i - start + 1;
+      let d, cls='day';
+      if(i<start){ d=new Date(y,m-1, prevLast.getDate()-start+i+1); cls+=' dim'; }
+      else if(dayNum>last.getDate()){ d=new Date(y,m+1, dayNum-last.getDate()); cls+=' dim'; }
+      else { d=new Date(y,m,dayNum); if(d.toDateString()===today.toDateString()) cls+=' today'; }
+      if(c===0) cls+=' sun'; if(c===6) cls+=' sat';
+      row += `<div class="${cls}">${d.getDate()}</div>`;
+    }
+    weeksHTML += `<div class="week">${row}<div class="underline"></div></div>`;
+  }
+  document.getElementById('weeks').innerHTML=weeksHTML;
+}
+render(new Date());
+</script>
+</body>
+</html>
