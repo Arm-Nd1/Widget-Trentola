@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calendario (solo) – v2 glass/obsidian</title>
+<style>
+  :root{
+    --bg:#0a0c10;
+    --text:#e6edf3;
+    --muted:#9aa7b3;
+    --panel: rgba(255,255,255,VAR_ALPHA);
+    --border: rgba(255,255,255,0.12);
+  }
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font:16px system-ui;}
+  .wrap{height:100%;padding:12px;box-sizing:border-box}
+  .card{height:100%;border-radius:18px;border:1px solid var(--border);background:var(--panel);
+        backdrop-filter:saturate(140%) blur(12px); overflow:hidden;
+        box-shadow:0 10px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04);
+        display:flex;flex-direction:column}
+  .head{padding:12px 16px;border-bottom:1px solid var(--border);font-weight:800;letter-spacing:.3px}
+  .mini{padding:16px}
+  .month{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:20px;font-weight:800}
+  .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+  .dow{font-size:12px;color:var(--muted);text-align:center}
+  .day{padding:12px 0;text-align:center;border-radius:12px;border:1px solid transparent;font-size:18px}
+  .dim{opacity:.35}
+  .today{background:linear-gradient(135deg, rgba(138,43,226,.25), rgba(0,208,255,.25)); border-color:rgba(255,255,255,.2); font-weight:900}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="head">Calendario</div>
+    <div class="mini">
+      <div class="month"><span id="monthName">—</span><span id="yearNum">—</span></div>
+      <div class="grid" id="dow"></div>
+      <div class="grid" id="days"></div>
+    </div>
+  </div>
+</div>
+<script>
+  const qs = new URLSearchParams(location.search);
+  const alpha = Math.max(0, Math.min(0.2, parseFloat(qs.get('alpha')) || 0.05));
+  document.documentElement.innerHTML = document.documentElement.innerHTML.replace(/VAR_ALPHA/g, alpha.toString());
+  const scale = Math.max(0.8, Math.min(1.6, parseFloat(qs.get('scale')) || 1.15));
+  document.documentElement.style.fontSize = (16*scale)+'px';
+
+  function renderMiniCal(date){
+    const dow = document.getElementById('dow');
+    const days = document.getElementById('days');
+    dow.innerHTML = ['L','M','M','G','V','S','D'].map(x=>`<div class="dow">${x}</div>`).join('');
+
+    const y = date.getFullYear();
+    const m = date.getMonth();
+    document.getElementById('monthName').textContent = date.toLocaleString('it-IT',{month:'long'}).replace(/\\b\\w/g, c=>c.toUpperCase());
+    document.getElementById('yearNum').textContent = y;
+
+    const first = new Date(y,m,1);
+    const last = new Date(y,m+1,0);
+    const prevLast = new Date(y,m,0);
+    const startIndex = (first.getDay()+6)%7; // Lunedì=0
+    const total = startIndex + last.getDate();
+    const rows = Math.ceil(total/7)*7;
+
+    const today = new Date();
+    const isToday = (d)=> d.getDate()===today.getDate() && d.getMonth()===today.getMonth() && d.getFullYear()===today.getFullYear();
+
+    let html='';
+    for(let i=0;i<rows;i++){
+      const dayNum = i - startIndex + 1;
+      let d, cls='day';
+      if(i<startIndex){
+        d = new Date(y,m-1, prevLast.getDate()-startIndex+i+1);
+        cls+=' dim';
+      } else if(dayNum>last.getDate()){
+        d = new Date(y,m+1, dayNum-last.getDate());
+        cls+=' dim';
+      } else {
+        d = new Date(y,m,dayNum);
+        if(isToday(d)) cls+=' today';
+      }
+      html+=`<div class="${cls}">${d.getDate()}</div>`;
+    }
+    days.innerHTML = html;
+  }
+  renderMiniCal(new Date());
+</script>
+</body>
+</html>
