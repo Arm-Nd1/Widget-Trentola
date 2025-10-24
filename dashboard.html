@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Widget Meteo & Calendario – Trentola-Ducenta</title>
+<style>
+  :root{
+    --bg1:#0b0f14; /* sfondo scuro */
+    --bg2:#1a1030; /* viola profondo */
+    --panel:rgba(255,255,255,.06);
+    --panel-strong:rgba(255,255,255,.12);
+    --border:rgba(255,255,255,.18);
+    --text:#e6edf3;
+    --muted:#9aa7b3;
+    --accent1:#8a2be2; /* viola elettrico */
+    --accent2:#00d0ff; /* turchese neon */
+    --accent3:#5b8cff; /* indaco */
+  }
+  html,body{height:100%;}
+  body{
+    margin:0; color:var(--text); background: radial-gradient(1200px 600px at 10% -10%, rgba(138,43,226,.25), transparent 60%),
+               radial-gradient(900px 600px at 100% 10%, rgba(0,208,255,.18), transparent 60%),
+               linear-gradient(180deg, var(--bg2) 0%, var(--bg1) 60%);
+    font: 14px system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, Noto Sans, 'Apple Color Emoji','Segoe UI Emoji';
+    overflow:hidden;
+  }
+  /* layout */
+  .wrap{display:grid; gap:16px; padding:16px; box-sizing:border-box; height:100%;}
+  .col{display:flex; flex-direction:column; gap:16px;}
+  @media(min-width:900px){
+    .wrap{grid-template-columns: 1.2fr 1fr;}
+  }
+  @media(max-width:899px){
+    .wrap{grid-template-columns: 1fr;}
+  }
+
+  /* pannelli glass */
+  .glass{
+    position:relative; background:var(--panel); border:1px solid var(--border);
+    border-radius:18px; backdrop-filter:saturate(140%) blur(12px);
+    box-shadow:0 12px 40px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.05);
+    overflow:hidden;
+  }
+  .glass::before{ /* bordo neon sottile */
+    content:""; position:absolute; inset:0; border-radius:18px; pointer-events:none;
+    padding:1px; background: linear-gradient(135deg, rgba(138,43,226,.6), rgba(0,208,255,.6));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+  }
+  .card{height:100%; display:flex; flex-direction:column;}
+  .head{display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--border); font-weight:600; letter-spacing:.3px;}
+  .body{flex:1;}
+
+  /* orologio */
+  .clock{display:flex; align-items:center; justify-content:space-between; padding:14px 16px; gap:16px;}
+  .clock .time{font-size:56px; font-weight:700; letter-spacing:2px; line-height:1;}
+  .clock .date{font-size:14px; color:var(--muted);}
+  .clock .loc{font-size:12px; opacity:.8}
+
+  /* mini calendario */
+  .mini-cal{padding:12px 16px 16px 16px;}
+  .mini-cal .monthbar{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
+  .mini-cal .monthbar .m{font-weight:700;}
+  .mini-cal .grid{display:grid; grid-template-columns: repeat(7, 1fr); gap:6px;}
+  .mini-cal .dow{font-size:11px; color:var(--muted); text-align:center;}
+  .mini-cal .day{padding:8px 0; text-align:center; border-radius:10px; background:transparent; border:1px solid transparent;}
+  .mini-cal .day.dim{opacity:.35}
+  .mini-cal .day.today{background:linear-gradient(135deg, rgba(138,43,226,.25), rgba(0,208,255,.25)); border-color:rgba(255,255,255,.2);}
+
+  /* meteo */
+  .wx{display:grid; grid-template-columns: 1.1fr 1fr; gap:12px; padding:16px; height:calc(100% - 0px);}
+  .wx-main{display:flex; flex-direction:column; gap:8px; justify-content:center;}
+  .wx-main .temp{font-size:68px; font-weight:800; letter-spacing:1px; display:flex; align-items:baseline; gap:8px;}
+  .wx-main .temp small{font-size:28px; opacity:.9}
+  .wx-main .meta{color:var(--muted); font-size:13px;}
+  .wx-icon{width:76px; height:76px;}
+  .wx-extra{display:flex; gap:16px; flex-wrap:wrap; margin-top:6px}
+  .pill{background:var(--panel-strong); border:1px solid var(--border); border-radius:12px; padding:6px 10px; font-size:12px;}
+  .wx-days{display:flex; flex-direction:column; gap:10px; justify-content:center;}
+  .day-row{display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--panel-strong); border:1px solid var(--border); border-radius:12px; padding:10px 12px;}
+  .day-row .name{width:92px; color:var(--muted)}
+  .day-row .mm{font-variant-numeric: tabular-nums;}
+  .d-ico{width:28px; height:28px; opacity:.95}
+
+  /* utilities */
+  .muted{color:var(--muted)}
+  .hidden{display:none !important}
+
+  /* per view=calendar: disporre clock sopra e mini-cal sotto in un pannello unico */
+  .cal-stack{display:flex; flex-direction:column; height:100%;}
+  .cal-stack .clock{padding-bottom:8px}
+  .cal-stack .mini-cal{flex:1}
+
+</style>
+</head>
+<body>
+  <div class="wrap" id="wrap">
+    <!-- Colonna sinistra: METEO grande -->
+    <div class="glass card" id="weatherCard">
+      <div class="head">Meteo • Trentola‑Ducenta</div>
+      <div class="body wx" id="wx">
+        <div class="wx-main">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <svg class="wx-icon" id="wxIcon" viewBox="0 0 64 64" fill="none"></svg>
+            <div>
+              <div class="temp" id="wxTemp">--<small>°C</small></div>
+              <div class="meta" id="wxCond">—</div>
+            </div>
+          </div>
+          <div class="wx-extra">
+            <div class="pill" id="wxWind">Vento: —</div>
+            <div class="pill" id="wxSun">Alba — • Tramonto —</div>
+          </div>
+        </div>
+        <div class="wx-days" id="wxDays"></div>
+      </div>
+    </div>
+
+    <!-- Colonna destra: CLOCK + MINI CALENDAR -->
+    <div class="col" id="rightCol">
+      <div class="glass card cal-stack" id="calCard">
+        <div class="head">Orologio & Calendario</div>
+        <div class="clock">
+          <div>
+            <div class="time" id="time">--:--</div>
+            <div class="date" id="date">—</div>
+          </div>
+          <div class="loc">Europe/Rome · Trentola‑Ducenta</div>
+        </div>
+        <div class="mini-cal">
+          <div class="monthbar"><span class="m" id="monthName">—</span>
+            <span class="muted" id="yearNum">—</span>
+          </div>
+          <div class="grid" id="dow"></div>
+          <div class="grid" id="days"></div>
+        </div>
+      </div>
+
+      <!-- slot libero per futuri toggle/launcher -->
+      <div class="glass card hidden" id="launchPad">
+        <div class="head">Launcher</div>
+        <div class="body" style="display:flex;align-items:center;justify-content:center;opacity:.6">In arrivo</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // ===== Utils di layout in base a ?view= =====
+  (function(){
+    const params = new URLSearchParams(location.search);
+    const view = (params.get('view')||'all').toLowerCase();
+    const weatherCard = document.getElementById('weatherCard');
+    const calCard = document.getElementById('calCard');
+    const wrap = document.getElementById('wrap');
+
+    if(view==='weather'){
+      // Solo meteo (altezza piena)
+      wrap.style.gridTemplateColumns = '1fr';
+      document.getElementById('rightCol').classList.add('hidden');
+    } else if(view==='calendar'){
+      // Solo orologio + mini calendario
+      wrap.style.gridTemplateColumns = '1fr';
+      weatherCard.classList.add('hidden');
+    } else {
+      // vista completa
+    }
+  })();
+
+  // ===== OROLOGIO =====
+  function pad(n){return String(n).padStart(2,'0')};
+  function tick(){
+    const now = new Date();
+    const hh = pad(now.getHours());
+    const mm = pad(now.getMinutes());
+    document.getElementById('time').textContent = `${hh}:${mm}`; // niente secondi per pulizia
+    const opts = {weekday:'long', day:'numeric', month:'long'};
+    const d = now.toLocaleDateString('it-IT', opts);
+    document.getElementById('date').textContent = d.replace(/\b\w/g, c=>c.toUpperCase());
+  }
+  tick(); setInterval(tick, 1000*15);
+
+  // ===== MINI CALENDARIO =====
+  function renderMiniCal(date){
+    const dow = document.getElementById('dow');
+    const days = document.getElementById('days');
+    dow.innerHTML = ['L','M','M','G','V','S','D'].map(x=>`<div class="dow">${x}</div>`).join('');
+
+    const y = date.getFullYear();
+    const m = date.getMonth();
+    document.getElementById('monthName').textContent = date.toLocaleString('it-IT',{month:'long'}).replace(/\b\w/g, c=>c.toUpperCase());
+    document.getElementById('yearNum').textContent = y;
+
+    const first = new Date(y,m,1);
+    const last = new Date(y,m+1,0);
+    const prevLast = new Date(y,m,0);
+    const startIndex = (first.getDay()+6)%7; // Lunedì=0
+    const total = startIndex + last.getDate();
+    const rows = Math.ceil(total/7)*7;
+
+    const today = new Date();
+    const isToday = (d)=> d.getDate()===today.getDate() && d.getMonth()===today.getMonth() && d.getFullYear()===today.getFullYear();
+
+    let html='';
+    for(let i=0;i<rows;i++){
+      const dayNum = i - startIndex + 1;
+      let d, cls='day';
+      if(i<startIndex){
+        d = new Date(y,m-1, prevLast.getDate()-startIndex+i+1);
+        cls+=' dim';
+      } else if(dayNum>last.getDate()){
+        d = new Date(y,m+1, dayNum-last.getDate());
+        cls+=' dim';
+      } else {
+        d = new Date(y,m,dayNum);
+        if(isToday(d)) cls+=' today';
+      }
+      html+=`<div class="${cls}">${d.getDate()}</div>`;
+    }
+    days.innerHTML = html;
+  }
+  renderMiniCal(new Date());
+
+  // ===== METEO (Open-Meteo – no API key) =====
+  const LAT = 40.976, LON = 14.206; // Trentola‑Ducenta
+  const tz = 'Europe/Rome';
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=temperature_2m,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset&forecast_days=4&timezone=${encodeURIComponent(tz)}`;
+
+  const WMO = {
+    0:{t:'Sereno', i:'sun'},
+    1:{t:'Preval. sereno', i:'sun-cloud'}, 2:{t:'Parz. nuvoloso', i:'sun-cloud'}, 3:{t:'Nuvoloso', i:'cloud'},
+    45:{t:'Nebbia', i:'fog'}, 48:{t:'Nebbia', i:'fog'},
+    51:{t:'Pioviggine', i:'drizzle'}, 53:{t:'Pioviggine', i:'drizzle'}, 55:{t:'Pioviggine', i:'drizzle'},
+    56:{t:'Geloviggine', i:'drizzle'}, 57:{t:'Geloviggine', i:'drizzle'},
+    61:{t:'Pioggia', i:'rain'}, 63:{t:'Pioggia', i:'rain'}, 65:{t:'Pioggia', i:'rain'},
+    66:{t:'Pioggia gelata', i:'rain'}, 67:{t:'Pioggia gelata', i:'rain'},
+    71:{t:'Neve', i:'snow'},72:{t:'Neve', i:'snow'},73:{t:'Neve', i:'snow'},75:{t:'Neve intensa', i:'snow'},
+    77:{t:'Nevischio', i:'snow'},
+    80:{t:'Rovesci', i:'rain'},81:{t:'Rovesci', i:'rain'},82:{t:'Rovesci', i:'rain'},
+    85:{t:'Rovesci di neve', i:'snow'},86:{t:'Rovesci di neve', i:'snow'},
+    95:{t:'Temporale', i:'storm'},96:{t:'Temporale', i:'storm'},99:{t:'Temporale', i:'storm'}
+  };
+
+  function iconSVG(kind, size=64){
+    // icone semplici in-line, stile minimal
+    const s = size;
+    const svg = (c)=>`<svg class="ico" viewBox="0 0 64 64" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">${c}</svg>`;
+    const sun = svg('<circle cx="32" cy="32" r="10" stroke="url(#g)"/><g stroke="currentColor"><path d="M32 6v8M32 50v8M6 32h8M50 32h8M13 13l6 6M45 45l6 6M13 51l6-6M45 19l6-6"/></g><defs><linearGradient id="g" x1="22" y1="22" x2="42" y2="42"><stop stop-color="#8a2be2"/><stop offset="1" stop-color="#00d0ff"/></linearGradient></defs>');
+    const cloud = svg('<path d="M20 40h24a10 10 0 0 0 0-20 14 14 0 0 0-27 3 9 9 0 0 0 3 17Z"/>');
+    const suncloud = svg('<circle cx="22" cy="22" r="7"/><path d="M18 42h24a10 10 0 0 0 0-20 14 14 0 0 0-27 3 9 9 0 0 0 3 17Z"/>');
+    const rain = svg('<path d="M18 38h26a9 9 0 1 0-4-17 13 13 0 0 0-25 4 8 8 0 0 0 3 13Z"/><path d="M22 46l-3 8M32 46l-3 8M42 46l-3 8"/>');
+    const drizzle = svg('<path d="M18 38h26a9 9 0 1 0-4-17 13 13 0 0 0-25 4 8 8 0 0 0 3 13Z"/><path d="M24 46l-2 5M32 46l-2 5M40 46l-2 5"/>');
+    const snow = svg('<path d="M18 38h26a9 9 0 1 0-4-17 13 13 0 0 0-25 4 8 8 0 0 0 3 13Z"/><g><path d="M23 46l3 6M29 46l-3 6M33 46l3 6M39 46l-3 6"/></g>');
+    const storm = svg('<path d="M18 38h26a9 9 0 1 0-4-17 13 13 0 0 0-25 4 8 8 0 0 0 3 13Z"/><path d="M30 44l-6 10 10-6-4 12"/>');
+    const fog = svg('<path d="M14 30h36M10 36h44M14 42h36"/><path d="M20 26h24a10 10 0 0 0 0-20 14 14 0 0 0-27 3 9 9 0 0 0 3 17Z" opacity=".4"/>');
+    const map={sun,cloud,suncloud,rain,drizzle,snow,storm,fog};
+    return map[kind]||cloud;
+  }
+
+  function codeTo(kind){
+    switch(kind){
+      case 'sun': return iconSVG('sun');
+      case 'cloud': return iconSVG('cloud');
+      case 'sun-cloud': return iconSVG('suncloud');
+      case 'rain': return iconSVG('rain');
+      case 'drizzle': return iconSVG('drizzle');
+      case 'snow': return iconSVG('snow');
+      case 'storm': return iconSVG('storm');
+      case 'fog': return iconSVG('fog');
+      default: return iconSVG('cloud');
+    }
+  }
+
+  function pickIcon(wmo){
+    const k = (WMO[wmo]||{i:'cloud',t:'—'}).i;
+    if(k==='sun-cloud') return codeTo('sun-cloud');
+    return codeTo(k);
+  }
+
+  function dayName(idx){
+    return ['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'][idx];
+  }
+
+  fetch(url).then(r=>r.json()).then(d=>{
+    const curT = Math.round(d.current.temperature_2m);
+    const code = d.current.weather_code;
+    const wind = Math.round(d.current.wind_speed_10m);
+    const daily = d.daily;
+
+    document.getElementById('wxTemp').innerHTML = `${curT}<small>°C</small>`;
+    document.getElementById('wxCond').textContent = (WMO[code]?.t)||'—';
+    document.getElementById('wxIcon').outerHTML = pickIcon(code);
+
+    function toHM(s){ const t = new Date(s); return `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`; }
+    document.getElementById('wxWind').textContent = `Vento: ${wind} m/s`;
+    document.getElementById('wxSun').textContent = `Alba ${toHM(daily.sunrise[0])} • Tramonto ${toHM(daily.sunset[0])}`;
+
+    const rows = [];
+    for(let i=0;i<daily.time.length;i++){
+      if(i===0) continue; // salta oggi nel riepilogo
+      const dt = new Date(daily.time[i]);
+      const name = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'][dt.getDay()];
+      const max = Math.round(daily.temperature_2m_max[i]);
+      const min = Math.round(daily.temperature_2m_min[i]);
+      const wc = daily.weather_code[i];
+      const icon = pickIcon(wc).replace('64','28');
+      rows.push(`<div class="day-row"><div class="name">${name}</div><div class="d-ico">${icon}</div><div class="mm"><strong>${max}°</strong> / ${min}°</div></div>`);
+    }
+    document.getElementById('wxDays').innerHTML = rows.join('');
+  }).catch(e=>{
+    document.getElementById('wxCond').textContent = 'Errore rete';
+    console.error(e);
+  });
+</script>
+</body>
+</html>
