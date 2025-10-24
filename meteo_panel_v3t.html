@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meteo — pannello nero v3t (tunable)</title>
+<style>
+  :root{ --text:#e6edf3; --muted:#9aa7b3; }
+  html,body{height:100%;margin:0;color:var(--text);font:16px system-ui, -apple-system, Segoe UI, Roboto}
+  body{background:#0a0c10}
+  .wrap{height:100%;padding:14px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px}
+  /* TOP PANEL */
+  .top{flex:1;min-height:0;border-radius:18px;background:#0b0e13;
+       box-shadow:0 0 0 1px rgba(255,255,255,.06) inset, 0 6px 24px rgba(0,0,0,.35);
+       padding:16px;display:grid;grid-template-columns: 1fr 1fr 1fr;grid-template-rows: auto 1fr auto;gap:12px;position:relative}
+  .cell{display:flex;align-items:center;gap:8px;position:relative}
+  .time{font-weight:800}
+  .bigtemp{font-size:110px;font-weight:900;line-height:.9;text-shadow:0 2px 6px rgba(0,0,0,.5)}
+  .icon{justify-content:center;align-items:center;font-size:64px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.3))}
+  .city{font-weight:800;letter-spacing:.3px}
+  .minmax{justify-content:center;align-items:flex-end;font-weight:900}
+  .chip{padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);font-size:13px}
+  /* Helpers for grid placement */
+  .tl{grid-column:1;grid-row:1;justify-content:flex-start}
+  .ml{grid-column:1;grid-row:2;justify-content:flex-start}
+  .bl{grid-column:1;grid-row:3;justify-content:flex-start}
+  .tc{grid-column:2;grid-row:1;justify-content:center}
+  .mc{grid-column:2;grid-row:2;justify-content:center}
+  .bc{grid-column:2;grid-row:3;justify-content:center}
+  .tr{grid-column:3;grid-row:1;justify-content:flex-end}
+  .mr{grid-column:3;grid-row:2;justify-content:flex-end}
+  .br{grid-column:3;grid-row:3;justify-content:flex-end}
+  /* FORECAST ROWS */
+  .rows{display:flex;flex-direction:column;gap:10px}
+  .row{display:grid;grid-template-columns: 1fr 1fr 1fr;align-items:center;
+       padding:12px 14px;border-radius:14px;background:#0b0e13;
+       box-shadow:0 0 0 1px rgba(255,255,255,.06) inset, 0 4px 16px rgba(0,0,0,.25)}
+  .rowIcon{font-size:24px;justify-self:end}
+  .rowDay{font-weight:900}
+  .rowTemp{justify-self:center;font-weight:800}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- TOP MAIN PANEL -->
+  <div class="top">
+    <!-- LEFT: Big temp + City -->
+    <div class="cell tl"><span class="bigtemp" id="temp">--°</span></div>
+    <div class="cell bl city" id="city">—</div>
+    <!-- CENTER: Icon + Min/Max -->
+    <div class="cell mc"><span class="icon" id="icon">☀️</span></div>
+    <div class="cell bc minmax" id="minmax">--° | --°</div>
+    <!-- RIGHT: Sunrise / Sunset / Wind -->
+    <div class="cell tr"><span>🌅</span><span class="time" id="sunrise">--:--</span></div>
+    <div class="cell mr"><span>🌇</span><span class="time" id="sunset">--:--</span></div>
+    <div class="cell br"><span class="chip" id="wind">Vento —</span></div>
+  </div>
+  <!-- FORECAST 3 ROWS -->
+  <div class="rows" id="rows"></div>
+</div>
+
+<script>
+const qs=new URLSearchParams(location.search);
+// Global scale
+const scale=Math.max(0.9,Math.min(1.6,parseFloat(qs.get('scale'))||1.10));
+document.documentElement.style.fontSize=(16*scale)+'px';
+// Coords
+const lat=parseFloat(qs.get('lat')||'40.97');
+const lon=parseFloat(qs.get('lon')||'14.18');
+const cityOverride=qs.get('place');
+
+// Utility to get int param with default
+function p(name, def){ const v=qs.get(name); if(v===null||v==='') return def; const n=parseInt(v,10); return isFinite(n)?n:def; }
+function setXY(el, x, y){ el.style.transform='translateX('+x+'px) translateY('+y+'px)'; }
+function setSize(el, sizePx){ if(sizePx){ el.style.fontSize=sizePx+'px'; } }
+
+function iconFor(code){
+  if([0].includes(code)) return '☀️';
+  if([1,2,3].includes(code)) return '🌤️';
+  if([45,48].includes(code)) return '🌫️';
+  if([51,53,55,56,57].includes(code)) return '🌦️';
+  if([61,63,65,80,81,82].includes(code)) return '🌧️';
+  if([71,73,75,77,85,86].includes(code)) return '🌨️';
+  if([95,96,99].includes(code)) return '⛈️';
+  return '⛅';
+}
+function dayLabel(iso){
+  const d=new Date(iso+'T12:00:00');
+  const w=d.toLocaleDateString('it-IT',{weekday:'long'});
+  const n=d.getDate();
+  return w.charAt(0).toUpperCase()+w.slice(1)+', '+n;
+}
+
+async function load(){
+  try{
+    const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,wind_speed_10m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset&timezone=auto`;
+    const r=await fetch(url); const data=await r.json();
+
+    // City
+    let city=cityOverride;
+    if(!city){
+      try{
+        const g=await fetch(`https://geocoding-api.open-meteo.com/v1/reverse?latitude=${lat}&longitude=${lon}&language=it`);
+        const gj=await g.json();
+        city=(gj && gj.results && gj.results[0])?(gj.results[0].name + (gj.results[0].admin1? ', '+gj.results[0].admin1:'')):'Località';
+      }catch(e){ city='Località'; }
+    }
+
+    // Populate top
+    const tempEl=document.getElementById('temp');
+    tempEl.textContent = Math.round(data.current.temperature_2m)+'°';
+    document.getElementById('icon').textContent = iconFor(data.current.weather_code);
+    document.getElementById('city').textContent = city;
+    const sr=new Date(data.daily.sunrise[0]).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+    const ss=new Date(data.daily.sunset[0]).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('sunrise').textContent=sr;
+    document.getElementById('sunset').textContent=ss;
+    const tmax=Math.round(data.daily.temperature_2m_max[0]);
+    const tmin=Math.round(data.daily.temperature_2m_min[0]);
+    document.getElementById('minmax').textContent = `${tmax}° | ${tmin}°`;
+    document.getElementById('wind').textContent = `Vento: ${Math.round(data.current.wind_speed_10m)} m/s`;
+
+    // Positions & sizes via URL params
+    setXY(tempEl, p('tempX',0), p('tempY',0));
+    setSize(tempEl, p('tempSize',0)); // px; 0 = default
+    setXY(document.getElementById('city'), p('cityX',0), p('cityY',0));
+    setXY(document.getElementById('icon'), p('iconX',0), p('iconY',0));
+    setSize(document.getElementById('icon'), p('iconSize',0));
+    setXY(document.getElementById('minmax'), p('minmaxX',0), p('minmaxY',0));
+    setXY(document.getElementById('sunrise'), p('sunriseX',0), p('sunriseY',0));
+    setXY(document.getElementById('sunset'), p('sunsetX',0), p('sunsetY',0));
+    setXY(document.getElementById('wind'), p('windX',0), p('windY',0));
+
+    // Forecast rows (3 giorni): left day, center temps, right icon
+    const cont=document.getElementById('rows'); cont.innerHTML='';
+    for(let i=1;i<=3;i++){
+      const name=dayLabel(data.daily.time[i]);
+      const code=data.daily.weather_code[i];
+      const mx=Math.round(data.daily.temperature_2m_max[i]);
+      const mn=Math.round(data.daily.temperature_2m_min[i]);
+      const row=document.createElement('div');
+      row.className='row';
+      row.innerHTML=`
+        <div class="rowDay">${name}</div>
+        <div class="rowTemp">${mx}° / ${mn}°</div>
+        <div class="rowIcon">${iconFor(code)}</div>
+      `;
+      cont.appendChild(row);
+    }
+  }catch(e){
+    console.error(e); document.getElementById('city').textContent='Errore meteo';
+  }
+}
+load();
+setInterval(load, 30*60*1000);
+</script>
+</body>
+</html>
