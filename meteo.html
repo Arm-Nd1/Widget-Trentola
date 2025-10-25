@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meteo — pannello nero v3u3 (iCUE)</title>
+
+<!-- Font monospazio stile flip-clock -->
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --text:#e6edf3; 
+    --muted:#9aa7b3; 
+    --k: 1.10; /* scaler globale +10% (la big temp NON usa questo scaler) */
+  }
+  html,body{height:100%;margin:0;color:var(--text);font:16px system-ui,-apple-system,Segoe UI,Roboto}
+  body{background:#0a0c10}
+  .wrap{height:100%;padding:14px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px}
+
+  /* TOP PANEL */
+  .top{
+    flex:1;min-height:0;border-radius:18px;background:#0b0e13;
+    box-shadow:0 0 0 1px rgba(255,255,255,.06) inset, 0 6px 24px rgba(0,0,0,.35);
+    padding:16px;display:grid;grid-template-columns:1fr 1fr 1fr;
+    grid-template-rows:auto 1fr auto;gap:12px;position:relative
+  }
+  .cell{display:flex;align-items:center;gap:8px;position:relative}
+
+  /* Alba/Tramonto +15% e poi +10% extra */
+  .time{font-weight:800;font-size:calc(1em * 1.15 * var(--k))}
+  /* Temperatura grande in stile flip-clock (dimensione invariata) */
+  .bigtemp{
+    font-family:'Share Tech Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:110px; /* NON modificata */
+    font-weight:800; line-height:0.9;
+    display:flex; gap:8px;
+  }
+  .bigtemp .tile{
+    display:inline-flex; align-items:center; justify-content:center;
+    height:1.02em; padding:0 14px;
+    color:#fff; background:#0e0f12;
+    border-radius:12px;
+    box-shadow: inset 0 -6px 16px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06);
+  }
+  .bigtemp .tile.small{ padding:0 10px; font-size:0.70em; }
+
+  .icon{justify-content:center;align-items:center;font-size:calc(64px * var(--k));filter:drop-shadow(0 2px 4px rgba(0,0,0,.3))}
+  .city{font-weight:800;letter-spacing:.3px;font-size:calc(1em * var(--k))}
+  .minmax{justify-content:center;align-items:flex-end;font-weight:900;font-size:calc(1em * 1.15 * var(--k))}
+  .chip{
+    padding:calc(6px * var(--k)) calc(10px * var(--k));
+    border-radius:999px;background:rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.08);
+    font-size:calc(13px * 1.15 * var(--k))
+  }
+
+  /* posizionamento griglia */
+  .tl{grid-column:1;grid-row:1;justify-content:flex-start}
+  .ml{grid-column:1;grid-row:2;justify-content:flex-start}
+  .bl{grid-column:1;grid-row:3;justify-content:flex-start}
+  .tc{grid-column:2;grid-row:1;justify-content:center}    /* icona tra gradi e alba */
+  .mc{grid-column:2;grid-row:2;justify-content:center}
+  .bc{grid-column:2;grid-row:3;justify-content:center}
+  .tr{grid-column:3;grid-row:1;justify-content:flex-end}
+  .mr{grid-column:3;grid-row:2;justify-content:flex-end}
+  .br{grid-column:3;grid-row:3;justify-content:flex-end}
+
+  /* RIGHE PREVISIONI */
+  .rows{display:flex;flex-direction:column;gap:10px}
+  .row{
+    display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;
+    padding:calc(12px * var(--k)) calc(14px * var(--k));
+    border-radius:14px;background:#0b0e13;
+    box-shadow:0 0 0 1px rgba(255,255,255,.06) inset, 0 4px 16px rgba(0,0,0,.25)
+  }
+  .rowDay{font-weight:900;font-size:calc(1em * 1.15 * var(--k))}
+  .rowTemp{justify-self:center;font-weight:800;font-size:calc(1em * 1.15 * var(--k))}
+  .rowIcon{font-size:calc(24px * 1.15 * var(--k));justify-self:end}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- PANNELLO IN ALTO -->
+  <div class="top">
+    <!-- SINISTRA: Gradi grandi + Città -->
+    <div class="cell tl"><span class="bigtemp" id="temp"></span></div>
+    <div class="cell bl city" id="city">TRENTOLA-DUCENTA</div>
+
+    <!-- CENTRO ALTO: Icona (tra gradi e alba) -->
+    <div class="cell tc"><span class="icon" id="icon">☀️</span></div>
+
+    <!-- CENTRO BASSO: Max | Min -->
+    <div class="cell bc minmax" id="minmax">--° | --°</div>
+
+    <!-- DESTRA: Alba / Tramonto / Vento -->
+    <div class="cell tr"><span>🌅</span><span class="time" id="sunrise">--:--</span></div>
+    <div class="cell mr"><span>🌇</span><span class="time" id="sunset">--:--</span></div>
+    <div class="cell br"><span class="chip" id="wind">Vento —</span></div>
+  </div>
+
+  <!-- TRE GIORNI SUCCESSIVI -->
+  <div class="rows" id="rows"></div>
+</div>
+
+<script>
+const qs=new URLSearchParams(location.search);
+// scala generale
+const scale=Math.max(0.9,Math.min(1.6,parseFloat(qs.get('scale'))||1.10));
+document.documentElement.style.fontSize=(16*scale)+'px';
+
+// coordinate (default Trentola-Ducenta)
+const lat=parseFloat(qs.get('lat')||'40.97');
+const lon=parseFloat(qs.get('lon')||'14.18');
+// città fissa (sovrascrivibile con ?place=)
+const cityOverride=qs.get('place') || 'TRENTOLA-DUCENTA';
+
+function iconFor(code){
+  if([0].includes(code)) return '☀️';
+  if([1,2,3].includes(code)) return '🌤️';
+  if([45,48].includes(code)) return '🌫️';
+  if([51,53,55,56,57].includes(code)) return '🌦️';
+  if([61,63,65,80,81,82].includes(code)) return '🌧️';
+  if([71,73,75,77,85,86].includes(code)) return '🌨️';
+  if([95,96,99].includes(code)) return '⛈️';
+  return '⛅';
+}
+function dayLabel(iso){
+  const d=new Date(iso+'T12:00:00');
+  const w=d.toLocaleDateString('it-IT',{weekday:'long'});
+  const n=d.getDate();
+  return w.charAt(0).toUpperCase()+w.slice(1)+', '+n;
+}
+/* render della temperatura in stile flip-clock */
+function renderBigTemp(value){
+  const wrap=document.getElementById('temp');
+  const s=String(value)+'°';
+  wrap.innerHTML='';
+  for(const ch of s){
+    const span=document.createElement('span');
+    span.className='tile'+(ch==='°'?' small':'');
+    span.textContent=ch;
+    wrap.appendChild(span);
+  }
+}
+
+async function load(){
+  try{
+    const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,wind_speed_10m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset&timezone=auto`;
+    const r=await fetch(url); const data=await r.json();
+
+    // top
+    renderBigTemp(Math.round(data.current.temperature_2m));
+    document.getElementById('icon').textContent = iconFor(data.current.weather_code);
+    document.getElementById('city').textContent = cityOverride;
+
+    const sr=new Date(data.daily.sunrise[0]).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+    const ss=new Date(data.daily.sunset[0]).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('sunrise').textContent=sr;
+    document.getElementById('sunset').textContent=ss;
+
+    const tmax=Math.round(data.daily.temperature_2m_max[0]);
+    const tmin=Math.round(data.daily.temperature_2m_min[0]);
+    document.getElementById('minmax').textContent = `${tmax}° | ${tmin}°`;
+    document.getElementById('wind').textContent = `Vento: ${Math.round(data.current.wind_speed_10m)} m/s`;
+
+    // 3 giorni successivi
+    const cont=document.getElementById('rows'); cont.innerHTML='';
+    for(let i=1;i<=3;i++){
+      const name=dayLabel(data.daily.time[i]);
+      const code=data.daily.weather_code[i];
+      const mx=Math.round(data.daily.temperature_2m_max[i]);
+      const mn=Math.round(data.daily.temperature_2m_min[i]);
+      const row=document.createElement('div');
+      row.className='row';
+      row.innerHTML=`
+        <div class="rowDay">${name}</div>
+        <div class="rowTemp">${mx}° / ${mn}°</div>
+        <div class="rowIcon">${iconFor(code)}</div>
+      `;
+      cont.appendChild(row);
+    }
+  }catch(e){
+    console.error(e);
+    document.getElementById('city').textContent='Errore meteo';
+  }
+}
+load();
+setInterval(load, 30*60*1000);
+</script>
+</body>
+</html>
