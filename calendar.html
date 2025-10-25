@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Calendario — finale</title>
 <style>
+  /* === FONT per il numero grande (stesso del meteo) === */
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
   :root{
     --text:#e6edf3; --muted:#9aa7b3;
     --accent:#6f3cff; --accent2:#6f3cff;
@@ -18,8 +21,14 @@
   .left{padding:16px; display:grid; grid-template-rows: auto 1fr auto; align-items:center}
   .dow{font-weight:900;letter-spacing:.35px;color:#f2c94c;
        text-transform:uppercase;text-shadow:0 1px 2px rgba(0,0,0,.6);}
-  .big{justify-self:center;font-size:128px;line-height:.9;font-weight:900;
-       letter-spacing:1px;text-shadow:0 2px 6px rgba(0,0,0,.5);color:var(--text);}
+  /* >>> aggiornato: font e spaziatura del numero grande <<< */
+  .big{
+       font-family:'Share Tech Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+       font-size:128px; line-height:.9; font-weight:800;
+       letter-spacing:-2px;               /* più “digitale” come il meteo */
+       text-shadow:0 2px 6px rgba(0,0,0,.5);
+       color:var(--text);
+  }
   .monthyear{justify-self:center;font-weight:800;color:#f2c94c;
              text-transform:uppercase;letter-spacing:.6px;text-shadow:0 1px 2px rgba(0,0,0,.5);}
   /* RIGHT = grid */
@@ -112,7 +121,7 @@ function render(date){
 
   // Posizionamenti finali (inline)
   setXY(document.getElementById('dowFull'), val('dowX'), val('dowY'));   // VENERDÌ
-  setY(document.getElementById('bigNum'), val('bigShift'));              // 24
+  setY(document.getElementById('bigNum'), val('bigShift'));              // numero grande
   setY(document.getElementById('monthYear'), val('month'));              // OTTOBRE 2025
   document.getElementById('rightInner').style.marginTop = px(val('shift')); // Griglia
 }
@@ -128,3 +137,4 @@ setInterval(()=>{
 </script>
 </body>
 </html>
+
