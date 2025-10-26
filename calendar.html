@@ -121,7 +121,7 @@ function render(date){
 
   // Posizionamenti finali (inline)
   setXY(document.getElementById('dowFull'), val('dowX'), val('dowY'));   // VENERDÌ
-  setY(document.getElementById('bigNum'), val('bigShift'));              // numero grande
+  setY(document.getElementById('bigNum'), val('bigX'), val('bigShift') + val('bigY'));   // numero grande
   setY(document.getElementById('monthYear'), val('month'));              // OTTOBRE 2025
   document.getElementById('rightInner').style.marginTop = px(val('shift')); // Griglia
 }
