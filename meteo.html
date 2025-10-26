@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Meteo — pannello nero (iCUE)</title>
+<title>Meteo — pannello finale (iCUE)</title>
 
 <!-- Font monospazio stile flip-clock -->
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
@@ -12,10 +12,10 @@
   :root{
     --text:#e6edf3; 
     --muted:#9aa7b3; 
-    --k: 1.10;          /* scaler UI globale (+10% elementi secondari) */
-    --riseSet: 1.10;    /* scala icone alba/tramonto (1.10 = +10%) */
-    --tileGap: 6px;     /* distanza tra “tile” dei gradi e il simbolo ° */
-    --iconK: 1.10;      /* scala icona meteo centrale (1.10 = +10%) */
+    --k: 1.10;       /* scaler UI per elementi secondari */
+    --riseSet: 3.00; /* icone alba/tramonto x3 (definitivo) */
+    --tileGap: 2px;  /* distanza tra cifre e simbolo ° (definitivo) */
+    --iconK: 1.50;   /* scala icona meteo centrale (definitivo) */
   }
   html,body{height:100%;margin:0;color:var(--text);font:16px system-ui,-apple-system,Segoe UI,Roboto}
   body{background:#0a0c10}
@@ -64,7 +64,7 @@
     border-radius:999px;background:rgba(255,255,255,.08);
     border:1px solid rgba(255,255,255,.12);
     font-size:calc(13px * 1.15 * var(--k));
-    color:#e6edf3; z-index:1; /* assicura visibilità sopra */
+    color:#e6edf3; z-index:1;
   }
 
   /* Posizionamento griglia */
@@ -93,7 +93,7 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="top">
+  <div class="top" id="root">
     <!-- SINISTRA: Gradi grandi + Città -->
     <div class="cell tl"><span class="bigtemp" id="temp"></span></div>
     <div class="cell bl city" id="city">TRENTOLA-DUCENTA</div>
@@ -115,37 +115,33 @@
 </div>
 
 <script>
-/* === PARAMETRI URL ===
-   scale, tempY, tileGap, degX, iconK, iconY, riseSet, minmaxX, minmaxY, windX, windY, lat, lon, place
-*/
-const qs = new URLSearchParams(location.search);
-function num(name, def){ const v=qs.get(name); const n=parseFloat(v); return (v!==null && !isNaN(n))? n : def; }
+/* ====== COSTANTI FINALI (nessun parametro URL necessario) ====== */
+const UI = {
+  scale:   1.20,   // scala globale
+  tempY:   60,     // gradi più in basso
+  tileGap: 2,      // spaziatura tra cifre e °
+  degX:   -25,     // ° più vicino alle cifre
+  iconK:   1.50,   // icona meteo +50%
+  iconY:   20,     // icona più in basso
+  riseSet: 3.00,   // icone alba/tramonto x3
+  minmaxX: 0,      // offset Min|Max (orizzontale)
+  minmaxY: 0,      // offset Min|Max (verticale)
+  windX:  10,      // offset vento (X)
+  windY:  10       // offset vento (Y)
+};
 
-// Scala generale (UI)
-const scale = num('scale', 1.10);
-document.documentElement.style.fontSize = (16 * scale) + 'px';
+// Applica scala globale
+document.documentElement.style.fontSize = (16 * UI.scale) + 'px';
 
-// Variabili di controllo
-const tempY    = num('tempY', 0);        // sposta gradi su/giù
-const tileGap  = num('tileGap', 6);      // distanza tra cifre e °
-const degX     = num('degX', -6);        // spinta orizzontale del simbolo °
-const iconK    = num('iconK', 1.10);     // scala icona meteo
-const iconY    = num('iconY', 0);        // offset verticale icona
-const riseSet  = num('riseSet', 1.10);   // scala icone alba/tramonto
-const minmaxX  = num('minmaxX', 0);      // offset Min|Max (X)
-const minmaxY  = num('minmaxY', 0);      // offset Min|Max (Y)
-const windX    = num('windX', 0);        // offset vento (X)
-const windY    = num('windY', 0);        // offset vento (Y)
+// Applica variabili CSS globali
+document.documentElement.style.setProperty('--tileGap', UI.tileGap + 'px');
+document.documentElement.style.setProperty('--riseSet', UI.riseSet);
+document.documentElement.style.setProperty('--iconK', UI.iconK);
 
-// Applica variabili CSS
-document.documentElement.style.setProperty('--tileGap', tileGap + 'px');
-document.documentElement.style.setProperty('--riseSet', riseSet);
-document.documentElement.style.setProperty('--iconK', iconK);
-
-// Coordinate/città
-const lat=parseFloat(qs.get('lat')||'40.97');
-const lon=parseFloat(qs.get('lon')||'14.18');
-const cityOverride=qs.get('place') || 'TRENTOLA-DUCENTA';
+// Coordinate/città fisse
+const lat = 40.97;
+const lon = 14.18;
+const city = 'TRENTOLA-DUCENTA';
 
 // Icone meteo
 function iconFor(code){
@@ -178,10 +174,10 @@ function renderBigTemp(value){
     wrap.appendChild(span);
   }
   // offset verticale dei gradi
-  wrap.style.transform = `translateY(${tempY}px)`;
+  wrap.style.transform = `translateY(${UI.tempY}px)`;
   // micro-spinta del simbolo °
   const degEl = wrap.querySelector('.deg');
-  if (degEl) degEl.style.transform = `translateX(${degX}px)`;
+  if (degEl) degEl.style.transform = `translateX(${UI.degX}px)`;
 }
 
 async function load(){
@@ -194,8 +190,8 @@ async function load(){
     renderBigTemp(Math.round(data.current.temperature_2m));
     const iconEl = document.getElementById('icon');
     iconEl.textContent = iconFor(data.current.weather_code);
-    iconEl.style.transform = `translateY(${iconY}px)`; // scala gestita via --iconK
-    document.getElementById('city').textContent = cityOverride;
+    iconEl.style.transform = `translateY(${UI.iconY}px)`; // scala via --iconK
+    document.getElementById('city').textContent = city;
 
     const sr=new Date(data.daily.sunrise[0]).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
     const ss=new Date(data.daily.sunset[0]).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
@@ -207,13 +203,13 @@ async function load(){
     const tmin=Math.round(data.daily.temperature_2m_min[0]);
     const mmEl=document.getElementById('minmax');
     mmEl.textContent = `${tmax}° | ${tmin}°`;
-    mmEl.style.transform = `translate(${minmaxX}px, ${minmaxY}px)`;
+    mmEl.style.transform = `translate(${UI.minmaxX}px, ${UI.minmaxY}px)`;
 
-    // Vento — sempre visibile, con offset opzionale
+    // Vento — sempre visibile, con offset
     const wind = Math.round(data.current.wind_speed_10m);
     const windEl = document.getElementById('wind');
     windEl.textContent = `Vento: ${wind} m/s`;
-    windEl.style.transform = `translate(${windX}px, ${windY}px)`;
+    windEl.style.transform = `translate(${UI.windX}px, ${UI.windY}px)`;
 
     // 3 giorni successivi
     const cont=document.getElementById('rows'); cont.innerHTML='';
