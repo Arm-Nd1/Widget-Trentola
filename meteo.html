@@ -176,6 +176,14 @@ async function load(){
 
     renderBigTemp(Math.round(data.current.temperature_2m));
     document.getElementById('icon').textContent = iconFor(data.current.weather_code);
+    // Applica anche gli offset verticali / orizzontali globali
+document.getElementById('temp').style.transform = `translateY(${tempY}px)`;
+document.getElementById('minmax').style.transform = `translate(${minmaxX}px, ${minmaxY}px)`;
+
+// Aggiungi la spinta del ° individuale
+const deg = document.querySelector('.deg');
+if (deg) deg.style.transform = `translateX(${degNudgeX}px)`;
+
     document.getElementById('icon').style.transform = `translateY(${iconY}px)`;
     document.getElementById('city').textContent = cityOverride;
 
