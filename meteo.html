@@ -5,21 +5,23 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Meteo — pannello nero (iCUE)</title>
 
+<!-- Font monospazio stile flip-clock -->
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
 
 <style>
   :root{
     --text:#e6edf3; 
     --muted:#9aa7b3; 
-    --k: 1.10;          /* scaler UI globale */
-    --riseSet: 1.10;    /* scala icone alba/tramonto */
-    --tileGap: 6px;     /* distanza tra ‘tile’ dei gradi */
+    --k: 1.10;          /* scaler UI globale (+10% elementi secondari) */
+    --riseSet: 1.10;    /* scala icone alba/tramonto (1.10 = +10%) */
+    --tileGap: 6px;     /* distanza tra “tile” dei gradi e il simbolo ° */
     --iconK: 1.10;      /* scala icona meteo centrale (1.10 = +10%) */
   }
   html,body{height:100%;margin:0;color:var(--text);font:16px system-ui,-apple-system,Segoe UI,Roboto}
   body{background:#0a0c10}
   .wrap{height:100%;padding:14px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px}
 
+  /* Pannello superiore */
   .top{
     flex:1;min-height:0;border-radius:18px;background:#0b0e13;
     box-shadow:0 0 0 1px rgba(255,255,255,.06) inset, 0 6px 24px rgba(0,0,0,.35);
@@ -28,6 +30,7 @@
   }
   .cell{display:flex;align-items:center;gap:8px;position:relative}
 
+  /* Alba/Tramonto */
   .time{font-weight:800;font-size:calc(1em * 1.15 * var(--k))}
   .rsIcon{font-size:calc(1em * var(--riseSet)); line-height:1;}
 
@@ -46,22 +49,25 @@
   }
   .bigtemp .tile.small{ padding:0 10px; font-size:0.70em; }
 
+  /* Icona meteo centrale */
   .icon{
     justify-content:center; align-items:center;
     font-size:calc(64px * var(--k) * var(--iconK));
     filter:drop-shadow(0 2px 4px rgba(0,0,0,.3));
     transition:transform .15s ease;
   }
+
   .city{font-weight:800;letter-spacing:.3px;font-size:calc(1em * var(--k))}
   .minmax{justify-content:center;align-items:flex-end;font-weight:900;font-size:calc(1em * 1.15 * var(--k)); transition:transform .15s ease;}
   .chip{
     padding:calc(6px * var(--k)) calc(10px * var(--k));
-    border-radius:999px;background:rgba(255,255,255,.06);
-    border:1px solid rgba(255,255,255,.08);
-    font-size:calc(13px * 1.15 * var(--k))
+    border-radius:999px;background:rgba(255,255,255,.08);
+    border:1px solid rgba(255,255,255,.12);
+    font-size:calc(13px * 1.15 * var(--k));
+    color:#e6edf3; z-index:1; /* assicura visibilità sopra */
   }
 
-  /* posizionamento griglia */
+  /* Posizionamento griglia */
   .tl{grid-column:1;grid-row:1;justify-content:flex-start}
   .ml{grid-column:1;grid-row:2;justify-content:flex-start}
   .bl{grid-column:1;grid-row:3;justify-content:flex-start}
@@ -72,7 +78,7 @@
   .mr{grid-column:3;grid-row:2;justify-content:flex-end}
   .br{grid-column:3;grid-row:3;justify-content:flex-end}
 
-  /* RIGHE PREVISIONI */
+  /* Righe previsioni */
   .rows{display:flex;flex-direction:column;gap:10px}
   .row{
     display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;
@@ -99,8 +105,8 @@
     <div class="cell bc minmax" id="minmax">--° | --°</div>
 
     <!-- DESTRA: Alba / Tramonto / Vento -->
-    <div class="cell tr"><span class="rsIcon">🌅</span><span class="time" id="sunrise">--:--</span></div>
-    <div class="cell mr"><span class="rsIcon">🌇</span><span class="time" id="sunset">--:--</span></div>
+    <div class="cell tr"><span class="rsIcon rise">🌅</span><span class="time" id="sunrise">--:--</span></div>
+    <div class="cell mr"><span class="rsIcon set">🌇</span><span class="time" id="sunset">--:--</span></div>
     <div class="cell br"><span class="chip" id="wind">Vento —</span></div>
   </div>
 
@@ -109,31 +115,39 @@
 </div>
 
 <script>
-const qs=new URLSearchParams(location.search);
+/* === PARAMETRI URL ===
+   scale, tempY, tileGap, degX, iconK, iconY, riseSet, minmaxX, minmaxY, windX, windY, lat, lon, place
+*/
+const qs = new URLSearchParams(location.search);
+function num(name, def){ const v=qs.get(name); const n=parseFloat(v); return (v!==null && !isNaN(n))? n : def; }
 
-// scala generale
-const scale=Math.max(0.9,Math.min(1.6,parseFloat(qs.get('scale'))||1.10));
-document.documentElement.style.fontSize=(16*scale)+'px';
+// Scala generale (UI)
+const scale = num('scale', 1.10);
+document.documentElement.style.fontSize = (16 * scale) + 'px';
 
-// parametri richiesti
-const tempY    = parseInt(qs.get('tempY')    || '0',   10);   // sposta i gradi in verticale
-const riseSet  = parseFloat(qs.get('riseSet')|| '1.10');      // scala icone alba/tramonto
-const tileGap  = parseInt(qs.get('tileGap')  || '6',   10);   // distanza tra cifre e °
-const degNudgeX= parseInt(qs.get('degX')     || '-6',  10);   // micro-spinta del simbolo °
-const iconK    = parseFloat(qs.get('iconK')  || '1.10');      // scala icona meteo centrale
-const iconY    = parseInt(qs.get('iconY')    || '0',   10);   // offset verticale icona meteo
-const minmaxX  = parseInt(qs.get('minmaxX')  || '0',   10);   // allineamento min/max
-const minmaxY  = parseInt(qs.get('minmaxY')  || '0',   10);
+// Variabili di controllo
+const tempY    = num('tempY', 0);        // sposta gradi su/giù
+const tileGap  = num('tileGap', 6);      // distanza tra cifre e °
+const degX     = num('degX', -6);        // spinta orizzontale del simbolo °
+const iconK    = num('iconK', 1.10);     // scala icona meteo
+const iconY    = num('iconY', 0);        // offset verticale icona
+const riseSet  = num('riseSet', 1.10);   // scala icone alba/tramonto
+const minmaxX  = num('minmaxX', 0);      // offset Min|Max (X)
+const minmaxY  = num('minmaxY', 0);      // offset Min|Max (Y)
+const windX    = num('windX', 0);        // offset vento (X)
+const windY    = num('windY', 0);        // offset vento (Y)
 
+// Applica variabili CSS
+document.documentElement.style.setProperty('--tileGap', tileGap + 'px');
 document.documentElement.style.setProperty('--riseSet', riseSet);
-document.documentElement.style.setProperty('--tileGap', tileGap+'px');
-document.documentElement.style.setProperty('--iconK', isNaN(iconK)? 1.10 : iconK);
+document.documentElement.style.setProperty('--iconK', iconK);
 
-// coordinate (default Trentola-Ducenta)
+// Coordinate/città
 const lat=parseFloat(qs.get('lat')||'40.97');
 const lon=parseFloat(qs.get('lon')||'14.18');
 const cityOverride=qs.get('place') || 'TRENTOLA-DUCENTA';
 
+// Icone meteo
 function iconFor(code){
   if([0].includes(code)) return '☀️';
   if([1,2,3].includes(code)) return '🌤️';
@@ -151,6 +165,7 @@ function dayLabel(iso){
   return w.charAt(0).toUpperCase()+w.slice(1)+', '+n;
 }
 
+// Render temperatura (tile + ° separato)
 function renderBigTemp(value){
   const wrap=document.getElementById('temp');
   const s=String(value)+'°';
@@ -164,27 +179,22 @@ function renderBigTemp(value){
   }
   // offset verticale dei gradi
   wrap.style.transform = `translateY(${tempY}px)`;
-  // micro-spinta orizzontale del simbolo °
-  const deg = wrap.querySelector('.deg');
-  if (deg) deg.style.transform = `translateX(${degNudgeX}px)`;
+  // micro-spinta del simbolo °
+  const degEl = wrap.querySelector('.deg');
+  if (degEl) degEl.style.transform = `translateX(${degX}px)`;
 }
 
 async function load(){
   try{
+    // Dati meteo
     const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,wind_speed_10m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset&timezone=auto`;
     const r=await fetch(url); const data=await r.json();
 
+    // Top
     renderBigTemp(Math.round(data.current.temperature_2m));
-    document.getElementById('icon').textContent = iconFor(data.current.weather_code);
-    // Applica anche gli offset verticali / orizzontali globali
-document.getElementById('temp').style.transform = `translateY(${tempY}px)`;
-document.getElementById('minmax').style.transform = `translate(${minmaxX}px, ${minmaxY}px)`;
-
-// Aggiungi la spinta del ° individuale
-const deg = document.querySelector('.deg');
-if (deg) deg.style.transform = `translateX(${degNudgeX}px)`;
-
-    document.getElementById('icon').style.transform = `translateY(${iconY}px)`;
+    const iconEl = document.getElementById('icon');
+    iconEl.textContent = iconFor(data.current.weather_code);
+    iconEl.style.transform = `translateY(${iconY}px)`; // scala gestita via --iconK
     document.getElementById('city').textContent = cityOverride;
 
     const sr=new Date(data.daily.sunrise[0]).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
@@ -192,12 +202,20 @@ if (deg) deg.style.transform = `translateX(${degNudgeX}px)`;
     document.getElementById('sunrise').textContent=sr;
     document.getElementById('sunset').textContent=ss;
 
+    // Min / Max con offset
     const tmax=Math.round(data.daily.temperature_2m_max[0]);
     const tmin=Math.round(data.daily.temperature_2m_min[0]);
     const mmEl=document.getElementById('minmax');
     mmEl.textContent = `${tmax}° | ${tmin}°`;
     mmEl.style.transform = `translate(${minmaxX}px, ${minmaxY}px)`;
 
+    // Vento — sempre visibile, con offset opzionale
+    const wind = Math.round(data.current.wind_speed_10m);
+    const windEl = document.getElementById('wind');
+    windEl.textContent = `Vento: ${wind} m/s`;
+    windEl.style.transform = `translate(${windX}px, ${windY}px)`;
+
+    // 3 giorni successivi
     const cont=document.getElementById('rows'); cont.innerHTML='';
     for(let i=1;i<=3;i++){
       const name=dayLabel(data.daily.time[i]);
