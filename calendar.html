@@ -77,6 +77,8 @@ const DEFAULTS = {
   dowX: 80,      // VENERDÌ orizzontale
   month: -210,   // OTTOBRE 2025 su
   bigShift: -80  // 24 su
+   bigX: 0,       // sposta orizzontalmente il numero grande (+ = destra, - = sinistra)
+  bigY: 0        // sposta verticalmente il numero grande (+ = giù, - = su)
 };
 
 // Permetti comunque override via URL (opzionale)
@@ -121,7 +123,7 @@ function render(date){
 
   // Posizionamenti finali (inline)
   setXY(document.getElementById('dowFull'), val('dowX'), val('dowY'));   // VENERDÌ
-  setY(document.getElementById('bigNum'), val('bigX'), val('bigShift'),val('bigY'));   // numero grande
+  setXY(document.getElementById('bigNum'), val('bigX'), val('bigShift') + val('bigY'));  // numero grande  
   setY(document.getElementById('monthYear'), val('month'));              // OTTOBRE 2025
   document.getElementById('rightInner').style.marginTop = px(val('shift')); // Griglia
 }
