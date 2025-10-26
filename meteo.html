@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Meteo — pannello nero v3u3 (iCUE)</title>
+<title>Meteo — pannello nero (iCUE)</title>
 
 <!-- Font monospazio stile flip-clock -->
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
@@ -12,7 +12,8 @@
   :root{
     --text:#e6edf3; 
     --muted:#9aa7b3; 
-    --k: 1.10; /* scaler globale +10% (la big temp NON usa questo scaler) */
+    --k: 1.10;        /* scaler UI globale (+10% sugli elementi minori) */
+    --riseSet: 1.10;  /* scala icone Alba/Tramonto: default +10% */
   }
   html,body{height:100%;margin:0;color:var(--text);font:16px system-ui,-apple-system,Segoe UI,Roboto}
   body{background:#0a0c10}
@@ -27,14 +28,16 @@
   }
   .cell{display:flex;align-items:center;gap:8px;position:relative}
 
-  /* Alba/Tramonto +15% e poi +10% extra */
+  /* Alba/Tramonto +15% (già) * +10% globale = var(--k) e in più riseSet per l'icona */
   .time{font-weight:800;font-size:calc(1em * 1.15 * var(--k))}
+  .rsIcon{font-size:calc(1em * var(--riseSet)); line-height:1;}
+
   /* Temperatura grande in stile flip-clock (dimensione invariata) */
   .bigtemp{
     font-family:'Share Tech Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
-    font-size:110px; /* NON modificata */
+    font-size:110px; /* non cambia con --k */
     font-weight:800; line-height:0.9;
-    display:flex; gap:8px;
+    display:flex; gap:8px; transition:transform .15s ease;
   }
   .bigtemp .tile{
     display:inline-flex; align-items:center; justify-content:center;
@@ -81,7 +84,6 @@
 </head>
 <body>
 <div class="wrap">
-  <!-- PANNELLO IN ALTO -->
   <div class="top">
     <!-- SINISTRA: Gradi grandi + Città -->
     <div class="cell tl"><span class="bigtemp" id="temp"></span></div>
@@ -94,8 +96,8 @@
     <div class="cell bc minmax" id="minmax">--° | --°</div>
 
     <!-- DESTRA: Alba / Tramonto / Vento -->
-    <div class="cell tr"><span>🌅</span><span class="time" id="sunrise">--:--</span></div>
-    <div class="cell mr"><span>🌇</span><span class="time" id="sunset">--:--</span></div>
+    <div class="cell tr"><span class="rsIcon">🌅</span><span class="time" id="sunrise">--:--</span></div>
+    <div class="cell mr"><span class="rsIcon">🌇</span><span class="time" id="sunset">--:--</span></div>
     <div class="cell br"><span class="chip" id="wind">Vento —</span></div>
   </div>
 
@@ -105,9 +107,15 @@
 
 <script>
 const qs=new URLSearchParams(location.search);
-// scala generale
+
+// scala generale (indipendente dalla big temp)
 const scale=Math.max(0.9,Math.min(1.6,parseFloat(qs.get('scale'))||1.10));
 document.documentElement.style.fontSize=(16*scale)+'px';
+
+// parametri posizione/dimensione richiesti
+const tempY = parseInt(qs.get('tempY') || '0', 10);          // sposta i gradi in verticale
+const riseSet = parseFloat(qs.get('riseSet') || '1.10');      // scala icone alba/tramonto (1.10 = +10%)
+document.documentElement.style.setProperty('--riseSet', riseSet);
 
 // coordinate (default Trentola-Ducenta)
 const lat=parseFloat(qs.get('lat')||'40.97');
@@ -131,7 +139,6 @@ function dayLabel(iso){
   const n=d.getDate();
   return w.charAt(0).toUpperCase()+w.slice(1)+', '+n;
 }
-/* render della temperatura in stile flip-clock */
 function renderBigTemp(value){
   const wrap=document.getElementById('temp');
   const s=String(value)+'°';
@@ -142,6 +149,8 @@ function renderBigTemp(value){
     span.textContent=ch;
     wrap.appendChild(span);
   }
+  // applica offset verticale ai gradi
+  wrap.style.transform = `translateY(${tempY}px)`;
 }
 
 async function load(){
@@ -186,6 +195,7 @@ async function load(){
   }
 }
 load();
+// refresh ogni 30 minuti
 setInterval(load, 30*60*1000);
 </script>
 </body>
