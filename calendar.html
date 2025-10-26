@@ -17,39 +17,53 @@
   body{background:#0a0c10}
   .wrap{height:100%;padding:12px;box-sizing:border-box}
   .card{height:100%;display:grid;grid-template-columns: 0.42fr 0.58fr;gap:18px;overflow:hidden}
+
   /* LEFT = big day */
   .left{padding:16px; display:grid; grid-template-rows: auto 1fr auto; align-items:center}
-  .dow{font-weight:900;letter-spacing:.35px;color:#f2c94c;
-       text-transform:uppercase;text-shadow:0 1px 2px rgba(0,0,0,.6);}
-  /* >>> aggiornato: font e spaziatura del numero grande <<< */
-  .big{
-       font-family:'Share Tech Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-       font-size:128px; line-height:.9; font-weight:800;
-       letter-spacing:-2px;               /* più “digitale” come il meteo */
-       text-shadow:0 2px 6px rgba(0,0,0,.5);
-       color:var(--text);
+  .dow{
+    font-weight:900; letter-spacing:.35px; color:#f2c94c;
+    text-transform:uppercase; text-shadow:0 1px 2px rgba(0,0,0,.6);
   }
-  .monthyear{justify-self:center;font-weight:800;color:#f2c94c;
-             text-transform:uppercase;letter-spacing:.6px;text-shadow:0 1px 2px rgba(0,0,0,.5);}
+  .big{
+    font-family:'Share Tech Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size:128px; line-height:.9; font-weight:800;
+    letter-spacing:-2px;
+    text-shadow:0 2px 6px rgba(0,0,0,.5);
+    color:var(--text);
+  }
+  .monthyear{
+    justify-self:center; font-weight:800; color:#f2c94c;
+    text-transform:uppercase; letter-spacing:.6px;
+    text-shadow:0 1px 2px rgba(0,0,0,.5);
+  }
+
   /* RIGHT = grid */
   .right{padding:16px; display:flex; flex-direction:column}
   .rightInner{}
   .dows{display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:8px}
-  .dowCell{font-size:13px;color:var(--muted);text-align:center;text-transform:uppercase;
-           text-shadow:0 1px 2px rgba(0,0,0,.35)}
+  .dowCell{
+    font-size:13px;color:var(--muted);text-align:center;text-transform:uppercase;
+    text-shadow:0 1px 2px rgba(0,0,0,.35)
+  }
   .dows .dowCell:first-child,
   .dows .dowCell:last-child{ color:#f2c94c; font-weight:900; }
   .weeks{display:flex;flex-direction:column;gap:14px}
   .week{position:relative;display:grid;grid-template-columns:repeat(7,1fr);gap:10px}
-  .underline{position:absolute;left:4px;right:4px;bottom:-3px;
-             height:4px;border-radius:4px;
-             background:linear-gradient(90deg,var(--accent),var(--accent2));opacity:.95}
-  .day{padding:10px 0;text-align:center;border-radius:12px;border:1px solid transparent;
-       font-size:22px;text-shadow:0 1px 2px rgba(0,0,0,.55);}
+  .underline{
+    position:absolute;left:4px;right:4px;bottom:-3px;
+    height:4px;border-radius:4px;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));opacity:.95
+  }
+  .day{
+    padding:10px 0;text-align:center;border-radius:12px;border:1px solid transparent;
+    font-size:22px;text-shadow:0 1px 2px rgba(0,0,0,.55);
+  }
   .dim{opacity:.35}
   .sun,.sat{color:#f2c94c}
-  .today{background:var(--todayBg);color:var(--todayFg);font-weight:900;
-         box-shadow:0 2px 10px rgba(0,0,0,.25)}
+  .today{
+    background:var(--todayBg);color:var(--todayFg);font-weight:900;
+    box-shadow:0 2px 10px rgba(0,0,0,.25)
+  }
 </style>
 </head>
 <body>
@@ -76,18 +90,22 @@ const DEFAULTS = {
   dowY: 60,      // VENERDÌ verticale
   dowX: 80,      // VENERDÌ orizzontale
   month: -210,   // OTTOBRE 2025 su
-  bigShift: -80  // 24 su
-   bigX: 0,       // sposta orizzontalmente il numero grande (+ = destra, - = sinistra)
-  bigY: 0        // sposta verticalmente il numero grande (+ = giù, - = su)
+  bigShift: -80, // 24 su
+  bigX: 0,       // sposta orizzontalmente (+ = destra, - = sinistra)
+  bigY: 0        // sposta verticalmente (+ = giù, - = su)
 };
 
-// Permetti comunque override via URL (opzionale)
+// Permetti override via URL
 const qs = new URLSearchParams(location.search);
-function val(name){ const v = qs.get(name); return v===null? DEFAULTS[name] : (isFinite(parseFloat(v))? parseFloat(v): DEFAULTS[name]); }
+function val(name){
+  const v = qs.get(name);
+  return v===null ? DEFAULTS[name] : (isFinite(parseFloat(v)) ? parseFloat(v) : DEFAULTS[name]);
+}
 
 // Applica scala
 document.documentElement.style.fontSize = (16 * val('scale')) + 'px';
 
+// Funzioni posizione
 function px(n){ return (n|0) + 'px'; }
 function setXY(el, x, y){ el.style.transform = 'translateX('+px(x)+') translateY('+px(y)+')'; }
 function setY(el, y){ el.style.transform = 'translateY('+px(y)+')'; }
@@ -121,10 +139,10 @@ function render(date){
   }
   document.getElementById('weeks').innerHTML=weeksHTML;
 
-  // Posizionamenti finali (inline)
-  setXY(document.getElementById('dowFull'), val('dowX'), val('dowY'));   // VENERDÌ
-  setXY(document.getElementById('bigNum'), val('bigX'), val('bigShift') + val('bigY'));  // numero grande  
-  setY(document.getElementById('monthYear'), val('month'));              // OTTOBRE 2025
+  // Posizionamenti finali
+  setXY(document.getElementById('dowFull'), val('dowX'), val('dowY'));   // Giorno della settimana
+  setXY(document.getElementById('bigNum'), val('bigX'), val('bigShift') + val('bigY'));  // Numero grande
+  setY(document.getElementById('monthYear'), val('month'));              // Mese e anno
   document.getElementById('rightInner').style.marginTop = px(val('shift')); // Griglia
 }
 
@@ -139,4 +157,3 @@ setInterval(()=>{
 </script>
 </body>
 </html>
-
